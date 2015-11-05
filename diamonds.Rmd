@@ -1,0 +1,11 @@
+library(ggplot2)
+
+# cut = Very Good
+# color = I
+# clarity SI1 / SI2
+df <- read.csv('diamonds.csv')
+max.price <- 5000 - 820
+
+select <- df$clarity == 'SI2' & df$color == 'I' & df$price < max.price
+g <- ggplot(df[select, ], aes(x=carat, y=price)) + geom_point(alpha=0.25) + facet_grid(. ~ cut) + theme_bw()
+print(g)
