@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import requests
 import argparse
+import warnings
 
 
 def download(params):
@@ -14,6 +15,11 @@ def download(params):
 
     # Put the data into a data frame.
     d = json.loads(response.text)
+    N = int(d['countRaw'])
+    n = len(d['results'])
+    if n < N:
+        msg = "You've downloaded %d of %d diamonds." % (n, N)
+        warnings.warn(msg)
     df = pd.DataFrame(d['results'])
 
     # Clean up the data.
