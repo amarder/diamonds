@@ -69,7 +69,7 @@ def parse_arguments():
 
     arguments_with_defaults = [
         ('startIndex', 0),
-        ('pageSize', 10),
+        ('pageSize', 100),
         ('country', 'USA'),
         ('language', 'en-us'),
         ('currency', 'USD'),
