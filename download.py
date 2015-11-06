@@ -6,15 +6,46 @@ import argparse
 import warnings
 
 
-def download(params):
-    # Get the data from Blue Nile.
-    # http://stackoverflow.com/questions/26165656/rcurl-r-package-geturl-webpage-error-when-scraping-api
+def _price_to_int(s):
+    return int(re.sub('[$,]', '', s))
+
+
+# It turns out Blue Nile's API will only let us grab 1000 diamonds
+# associated with each query. To get around this, let's use price to
+# page through the results.
+# 1. Get first thousand diamonds in query.
+# 2. Use diamond with highest price in that query to seed the next
+#    query.
+def diamonds(params):
+    assert params['sortColumn'] == 'price' and params['sortDirection'] == 'asc'
+
     landing_page = requests.get('http://www.bluenile.com/')
     url = 'http://www.bluenile.com/api/public/diamond-search-grid/solr'
-    response = requests.get(url, params, cookies=landing_page.cookies)
+    result = []
+    while True:
+        response = requests.get(url, params, cookies=landing_page.cookies)
+        print response.url
+        d = json.loads(response.text)
+        last_page = params['pageSize'] >= d['countRaw']
+
+        for i in range(len(d['results'])):
+            d['results'][i]['price'] = _price_to_int(d['results'][i]['price'])
+        max_price = d['results'][-1]['price']
+        min_price = d['results'][0]['price']
+
+        if last_page:
+            result += d['results']
+            break
+        else:
+            assert min_price < max_price, 'There are over %d diamonds with these characteristics at this price %d.' % (params['pageSize'], min_price)
+            result += [x for x in d['results'] if x['price'] < max_price]
+            params['minPrice'] = max_price
+    return result
+
+
+def download(params):
 
     # Put the data into a data frame.
-    d = json.loads(response.text)
     N = int(d['countRaw'])
     n = len(d['results'])
     if n < N:
@@ -26,7 +57,7 @@ def download(params):
     for col in ['carat', 'depth', 'lxwRatio', 'table']:
         df[col] = df[col].astype(float)
     for col in ['price', 'pricePerCarat']:
-        df[col] = df[col].map(lambda s: re.sub('[$,]', '', s)).astype(int)
+        df[col] = df[col].map(_price_to_int)
 
     return df
 
@@ -69,10 +100,12 @@ def parse_arguments():
 
     arguments_with_defaults = [
         ('startIndex', 0),
-        ('pageSize', 100),
+        ('pageSize', 1000),
         ('country', 'USA'),
         ('language', 'en-us'),
         ('currency', 'USD'),
+        ('sortColumn', 'price'),
+        ('sortDirection', 'asc'),
     ]
     for k, v in arguments_with_defaults:
         parser.add_argument('--%s' % k, default=v, type=type(v))
@@ -87,8 +120,10 @@ def parse_arguments():
 
 def main():
     params = parse_arguments()
-    df = download(params)
-    print df.to_csv(index=False)
+    l = diamonds(params)
+    print len(l)
+    # df = download(params)
+    # print df.to_csv(index=False)
 
 
 if __name__ == '__main__':
