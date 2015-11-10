@@ -1,11 +1,157 @@
-```{r}
+---
+title: Blue Nile + Data Analysis = Diamond Deals
+date: 2015-11-11
+---
+
+# Introduction
+
+# Downloading the data
+
+# Modeling price as a function of the Four C's
+
+# Identifying diamond deals
+
+This post is aimed at everyone who wants to buy a diamond and is excited by the prospect of data mining for good deals on diamonds. If you're still reading, you're in a niche audience!
+
+Are you shopping for a diamond? This is a guide on how to download data from 
+
+> Founded in 1999, Blue Nile has grown to become the largest online
+> retailer of certified diamonds and fine jewelry. Internet Retailer
+> Magazine reports Blue Nile is bigger than the next three largest
+> online jewelers combined.
+
+
+When browsing diamonds on Blue Nile, I noticed that requests are made to a Solr
+database containing information about each diamond on Blue
+Nile. This is awesome. On November 6, 2015, I downloaded the data on
+all 98,886 round diamonds on Blue Nile! My understanding of diamond
+pricing is based on Blue Nile's excellent
+[diamond buying guide][buying-guide]. The four C's (cut, color,
+clarity, and carat weight) are the most important characteristics when
+buying a diamond. Let's model price as a function of those four
+characteristics and use that model to find potential deals.
+
+```{r, message=FALSE, echo=FALSE}
+library(dplyr)
 library(ggplot2)
+library(msm)
+library(knitr)
+library(grDevices)
 
-diamonds <- read.csv('diamonds.csv')
+opts_chunk$set(echo=FALSE)
+options(stringsAsFactors=TRUE)
+diamonds <- read.csv('rounds.csv')
+diamonds$tenths <- floor((10 * diamonds$carat) %% 10)
 
-(
-    ggplot(diamonds, aes(x=carat, y=price)) +
-    geom_point(alpha=0.25) +
-    theme_bw()
+# Set up dummy variables
+values <- list(
+  cut=c('Good', 'Very Good', 'Ideal', 'Signature Ideal'),
+  color=c('J', 'I', 'H', 'G', 'F', 'E', 'D'),
+  clarity=c('SI2', 'SI1', 'VS2', 'VS1', 'VVS2', 'VVS1', 'IF', 'FL')
+)
+for (x in names(values)) {
+  vals <- values[[x]]
+  for (i in 2:length(vals)) {
+    diamonds[[paste0(x, i)]] <- as.numeric(diamonds[[x]] == vals[i])
+    diamonds[[x]] <- ordered(diamonds[[x]], levels=vals)
+  }
+}
+dummies <- grep('\\d', names(diamonds), value=TRUE)
+
+stats <- lapply(diamonds[, c('price', 'carat', dummies)], function(x)
+  c(min=min(x), median=median(x), mean=mean(x), max=max(x))
 )
 ```
+
+```{r big_picture}
+# Use some uniform noise to smooth out distribution of diamond weights.
+# Diamond weight is rounded to 1/100 of a carat.
+diamonds$noise <- runif(nrow(diamonds), 0, 0.01)
+
+carats <- 2^(-2:4)
+prices <- 1000 * 5^(0:4)
+price_labels <- paste0('$', prices / 1000, ',000')
+(
+    ggplot(diamonds %>% filter(carat <= 8), aes(x=log(carat + noise), y=log(price))) +
+    stat_smooth(method='lm') +
+    geom_point(size=0.3) +
+    scale_x_continuous(breaks=log(carats), labels=carats) +
+    scale_y_continuous(breaks=log(prices), labels=price_labels) +
+    ggtitle('Diamond price as a function of diamond weight') +
+    ylab("Price") +
+    xlab('Carat Weight') +
+    theme_bw() +
+    theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank())
+)
+```
+
+```{r zoomed_in}
+carats <- seq(1, 1.9, 0.1)
+prices <- 1000 * 2^(2:5)
+price_labels <- paste0('$', prices / 1000, ',000')
+diamonds <- diamonds %>% filter(1 <= carat & carat < 2)
+(
+    ggplot(diamonds, aes(x=log(carat + noise), y=log(price), color=color)) +
+    geom_point(size=0.4) +
+    stat_smooth(method='lm') +
+    scale_x_continuous(breaks=log(carats), labels=carats) +
+    scale_y_continuous(breaks=log(prices), labels=price_labels) +
+    ggtitle('Diamond price as a function of weight and color') +
+    ylab("Price") +
+    xlab('Carat Weight') +
+    theme_bw() +
+    theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank())
+)
+
+my_formula <- paste('log(price) ~ log(carat) +',
+  paste(dummies, collapse='+')
+)
+fit <- lm(my_formula, data=diamonds)
+summary(fit)
+```
+
+We just fit the following model
+$$
+\log(price_i) = \alpha + \beta^0 \log(carat_i) + \beta^1_{cut(i)} + \beta^2_{color(i)} + \beta^3_{clarity(i)} + \epsilon_i
+$$
+Exponentiating both sides of the equation we have a multiplicative relationship between price and the Four C's:
+$$
+price_i = \exp(\alpha) \cdot carat_i^{\beta^0} \cdot \exp\left(\beta^1_{cut(i)}\right) \cdot \exp\left(\beta^2_{color(i)}\right) \cdot \exp\left(\beta^3_{clarity(i)}\right) \cdot \exp(\epsilon_i)
+$$
+Exponentiating the coefficients from our regression model we can get estimates of the price multipliers associated with different diamond characteristics. These multipliers can help a shopper decide what type of diamond to look at. Is a G-color diamond worth `r round(exp(coef(fit)['color4']), 2)` times the price of a J-color diamond?
+
+```{r coefplot}
+l <- lapply(dummies, function(s) {
+  beta <- coef(fit)[[s]]
+  variance <- vcov(fit)[s, s]
+  new_variance <- deltamethod(~ exp(x1), beta, variance)
+  c(multiplier=exp(beta), variance=new_variance)
+})
+multipliers <- data.frame(do.call(rbind, l))
+multipliers$variable <- unlist(sapply(names(values), function(x) paste(values[[x]][-1], '-', x)))
+multipliers$y <- nrow(multipliers) - 1:nrow(multipliers)
+diff <- qnorm(0.95, mean=0, sd=sqrt(multipliers$variance))
+multipliers$low <- multipliers$multiplier - diff
+multipliers$high <- multipliers$multiplier + diff
+(
+    ggplot(multipliers, aes(x=multiplier, y=y)) +
+    geom_point() +
+    scale_y_continuous(breaks=multipliers$y, labels=multipliers$variable) +
+    theme_bw() +
+    geom_errorbarh(aes(xmax=high, xmin=low), height=0) +
+    ylab('') +
+    xlab('Price Multiplier') +
+    ggtitle('Price multipliers for cut, color, and clarity types')
+)
+```
+
+```{r}
+yhat <- exp(predict(fit))
+diamonds$markup <- (diamonds$price / yhat - 1) * 100
+diamonds %>% arrange(markup) %>% select(markup, carat, cut, color, clarity, price) %>% head(20)
+```
+
+[blue-nile]: http://www.bluenile.com/
+[solr]: http://lucene.apache.org/solr/
+[buying-guide]: http://www.bluenile.com/education/diamonds/
+[delta-method]: http://www.ats.ucla.edu/stat/r/faq/deltamethod.htm

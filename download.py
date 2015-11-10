@@ -24,7 +24,6 @@ def diamonds(params):
     result = []
     while True:
         response = requests.get(url, params, cookies=landing_page.cookies)
-        print response.url
         d = json.loads(response.text)
         last_page = params['pageSize'] >= d['countRaw']
 
@@ -43,20 +42,14 @@ def diamonds(params):
     return result
 
 
-def download(params):
-
+def clean(data):
     # Put the data into a data frame.
-    N = int(d['countRaw'])
-    n = len(d['results'])
-    if n < N:
-        msg = "You've downloaded %d of %d diamonds." % (n, N)
-        warnings.warn(msg)
-    df = pd.DataFrame(d['results'])
+    df = pd.DataFrame(data)
 
     # Clean up the data.
     for col in ['carat', 'depth', 'lxwRatio', 'table']:
-        df[col] = df[col].astype(float)
-    for col in ['price', 'pricePerCarat']:
+        df[col] = df[col].map(lambda s: s.replace(',', '')).astype(float)
+    for col in ['pricePerCarat']:
         df[col] = df[col].map(_price_to_int)
 
     return df
@@ -121,9 +114,8 @@ def parse_arguments():
 def main():
     params = parse_arguments()
     l = diamonds(params)
-    print len(l)
-    # df = download(params)
-    # print df.to_csv(index=False)
+    df = clean(l)
+    print df.to_csv(index=False)
 
 
 if __name__ == '__main__':
