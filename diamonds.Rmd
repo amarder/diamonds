@@ -3,35 +3,55 @@ title: Blue Nile + Data Analysis = Diamond Deals
 date: 2015-11-11
 ---
 
-# Introduction
-
-# Downloading the data
-
-# Modeling price as a function of the Four C's
-
-# Identifying diamond deals
-
-This post is aimed at everyone who wants to buy a diamond and is excited by the prospect of data mining for good deals on diamonds. If you're still reading, you're in a niche audience!
-
-Are you shopping for a diamond? This is a guide on how to download data from 
+Are you looking to buy a diamond? This how-to guide describes the
+three steps I took to identify great deals on [Blue Nile][blue-nile].
 
 > Founded in 1999, Blue Nile has grown to become the largest online
 > retailer of certified diamonds and fine jewelry. Internet Retailer
 > Magazine reports Blue Nile is bigger than the next three largest
 > online jewelers combined.
 
+The code used to produce this guide has been posted on
+[GitHub][repo]. This guide proceeds as follows:
 
-When browsing diamonds on Blue Nile, I noticed that requests are made to a Solr
-database containing information about each diamond on Blue
-Nile. This is awesome. On November 6, 2015, I downloaded the data on
-all 98,886 round diamonds on Blue Nile! My understanding of diamond
-pricing is based on Blue Nile's excellent
+1.  Download data from Blue Nile.
+2.  Model price as a function of diamond characteristics.
+3.  Identify diamonds with low prices.
+
+# Downloading the data
+
+I've written a Python script to make downloading data from Blue Nile
+easy. The script has been posted [here][download.py]. To download data
+on all round diamonds on Blue Nile use the following command:
+
+    python download.py --shape RD > my_diamonds.csv
+
+For more information on the optional arguments the script accepts use:
+
+    python download.py --help
+
+Most of the download script is pretty easy to follow. Blue Nile is
+using Apache Solr to serve out JSON documents describing diamonds on
+the site. The only tricky part is you can only get information on the
+first 1000 diamonds for each query - Blue Nile has limited how far we
+can page through results. To work around this constraint, the download
+script pages through results based on price. I only mention this if
+you want to dig deeper into the download script.
+
+Please note, if you end up using this script to hit Blue Nile's server
+please don't hit it too hard. To download all the round diamonds on
+the site requires about 100 queries. If a lot of people start using
+this script, Blue Nile might get angry.
+
+# Modeling price as a function of the Four C's
+
+My understanding of diamond pricing is based on Blue Nile's excellent
 [diamond buying guide][buying-guide]. The four C's (cut, color,
 clarity, and carat weight) are the most important characteristics when
-buying a diamond. Let's model price as a function of those four
-characteristics and use that model to find potential deals.
+buying a diamond. As a starting point it seems reasonable to model
+price as a function of those four characteristics.
 
-```{r, message=FALSE, echo=FALSE}
+```{r setup, message=FALSE, echo=FALSE}
 library(dplyr)
 library(ggplot2)
 library(msm)
@@ -61,7 +81,12 @@ dummies <- grep('\\d', names(diamonds), value=TRUE)
 stats <- lapply(diamonds[, c('price', 'carat', dummies)], function(x)
   c(min=min(x), median=median(x), mean=mean(x), max=max(x))
 )
+
+my_format <- function(x) format(x, scientific=FALSE, big.mark=',')
 ```
+
+On November 6, 2015, I downloaded the data on
+all `r my_format(nrow(diamonds))` round diamonds on Blue Nile!
 
 ```{r big_picture}
 # Use some uniform noise to smooth out distribution of diamond weights.
@@ -84,6 +109,8 @@ price_labels <- paste0('$', prices / 1000, ',000')
     theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank())
 )
 ```
+
+# Identifying diamond deals
 
 ```{r zoomed_in}
 carats <- seq(1, 1.9, 0.1)
@@ -155,3 +182,5 @@ diamonds %>% arrange(markup) %>% select(markup, carat, cut, color, clarity, pric
 [solr]: http://lucene.apache.org/solr/
 [buying-guide]: http://www.bluenile.com/education/diamonds/
 [delta-method]: http://www.ats.ucla.edu/stat/r/faq/deltamethod.htm
+[repo]: https://github.com/amarder/diamonds
+[download.py]: https://github.com/amarder/diamonds/blob/master/download.py
