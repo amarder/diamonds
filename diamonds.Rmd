@@ -43,13 +43,7 @@ please don't hit it too hard. To download all the round diamonds on
 the site requires about 100 queries. If a lot of people start using
 this script, Blue Nile might get angry.
 
-# Modeling price as a function of the Four C's
-
-My understanding of diamond pricing is based on Blue Nile's excellent
-[diamond buying guide][buying-guide]. The four C's (cut, color,
-clarity, and carat weight) are the most important characteristics when
-buying a diamond. As a starting point it seems reasonable to model
-price as a function of those four characteristics.
+# Modeling price
 
 ```{r setup, message=FALSE, echo=FALSE}
 library(dplyr)
@@ -85,8 +79,9 @@ stats <- lapply(diamonds[, c('price', 'carat', dummies)], function(x)
 my_format <- function(x) format(x, scientific=FALSE, big.mark=',')
 ```
 
-On November 6, 2015, I downloaded the data on
-all `r my_format(nrow(diamonds))` round diamonds on Blue Nile!
+On November 6, 2015, I downloaded data on all `r
+my_format(nrow(diamonds))` round diamonds on Blue Nile. Below is a
+plot of diamond price versus carat weight (both on log scales).
 
 ```{r big_picture}
 # Use some uniform noise to smooth out distribution of diamond weights.
@@ -110,7 +105,11 @@ price_labels <- paste0('$', prices / 1000, ',000')
 )
 ```
 
-# Identifying diamond deals
+Blue Nile's [diamond buying guide][buying-guide] describes that the
+four C's (cut, color, clarity, and carat weight) are the most
+important characteristics when buying a diamond. As a starting point
+it seems reasonable to model price as a function of those four
+characteristics.
 
 ```{r zoomed_in}
 carats <- seq(1, 1.9, 0.1)
@@ -134,7 +133,6 @@ my_formula <- paste('log(price) ~ log(carat) +',
   paste(dummies, collapse='+')
 )
 fit <- lm(my_formula, data=diamonds)
-summary(fit)
 ```
 
 We just fit the following model
@@ -146,6 +144,10 @@ $$
 price_i = \exp(\alpha) \cdot carat_i^{\beta^0} \cdot \exp\left(\beta^1_{cut(i)}\right) \cdot \exp\left(\beta^2_{color(i)}\right) \cdot \exp\left(\beta^3_{clarity(i)}\right) \cdot \exp(\epsilon_i)
 $$
 Exponentiating the coefficients from our regression model we can get estimates of the price multipliers associated with different diamond characteristics. These multipliers can help a shopper decide what type of diamond to look at. Is a G-color diamond worth `r round(exp(coef(fit)['color4']), 2)` times the price of a J-color diamond?
+
+```{r}
+summary(fit)
+```
 
 ```{r coefplot}
 l <- lapply(dummies, function(s) {
@@ -171,6 +173,8 @@ multipliers$high <- multipliers$multiplier + diff
     ggtitle('Price multipliers for cut, color, and clarity types')
 )
 ```
+
+# Identifying diamond deals
 
 ```{r}
 yhat <- exp(predict(fit))
