@@ -3,22 +3,18 @@ title: Blue Nile + Data Analysis = Diamond Deals
 date: 2015-11-11
 ---
 
-Are you looking to buy a diamond? This how-to guide describes the
-three steps I took to identify great deals on [Blue Nile][blue-nile].
+Are you looking to buy a diamond? This how-to guide describes three
+steps I took to identify great deals on [Blue
+Nile][blue-nile]. "Founded in 1999, Blue Nile has grown to become the
+largest online retailer of certified diamonds and fine jewelry." The
+code used in this analysis is available on [GitHub][repo]. This guide
+proceeds as follows:
 
-> Founded in 1999, Blue Nile has grown to become the largest online
-> retailer of certified diamonds and fine jewelry. Internet Retailer
-> Magazine reports Blue Nile is bigger than the next three largest
-> online jewelers combined.
+1.  download data from Blue Nile,
+2.  model price as a function of diamond characteristics, and
+3.  identify diamonds with extra low prices.
 
-The code used to produce this guide has been posted on
-[GitHub][repo]. This guide proceeds as follows:
-
-1.  Download data from Blue Nile.
-2.  Model price as a function of diamond characteristics.
-3.  Identify diamonds with low prices.
-
-# Downloading the data
+# Downloading Data
 
 I've written a Python script to make downloading data from Blue Nile
 easy. The script has been posted [here][download.py]. To download data
@@ -33,17 +29,10 @@ For more information on the optional arguments the script accepts use:
 Most of the download script is pretty easy to follow. Blue Nile is
 using Apache Solr to serve out JSON documents describing diamonds on
 the site. The only tricky part is you can only get information on the
-first 1000 diamonds for each query - Blue Nile has limited how far we
+first 1000 diamonds for each query; Blue Nile has limited how far we
 can page through results. To work around this constraint, the download
 script pages through results based on price. I only mention this if
 you want to dig deeper into the download script.
-
-Please note, if you end up using this script to hit Blue Nile's server
-please don't hit it too hard. To download all the round diamonds on
-the site requires about 100 queries. If a lot of people start using
-this script, Blue Nile might get angry.
-
-# Modeling price
 
 ```{r setup, message=FALSE, echo=FALSE}
 library(dplyr)
@@ -79,8 +68,8 @@ stats <- lapply(diamonds[, c('price', 'carat', dummies)], function(x)
 my_format <- function(x) format(x, scientific=FALSE, big.mark=',')
 ```
 
-On November 6, 2015, I downloaded data on all `r
-my_format(nrow(diamonds))` round diamonds on Blue Nile. Below is a
+On November 6, 2015, I downloaded data on all `r my_format(nrow(diamonds))`
+round diamonds on Blue Nile. Below is a
 plot of diamond price versus carat weight (both on log scales).
 
 ```{r big_picture}
@@ -97,7 +86,7 @@ price_labels <- paste0('$', prices / 1000, ',000')
     geom_point(size=0.3) +
     scale_x_continuous(breaks=log(carats), labels=carats) +
     scale_y_continuous(breaks=log(prices), labels=price_labels) +
-    ggtitle('Diamond price as a function of diamond weight') +
+    ggtitle('Diamond price versus diamond weight') +
     ylab("Price") +
     xlab('Carat Weight') +
     theme_bw() +
@@ -105,11 +94,29 @@ price_labels <- paste0('$', prices / 1000, ',000')
 )
 ```
 
-Blue Nile's [diamond buying guide][buying-guide] describes that the
-four C's (cut, color, clarity, and carat weight) are the most
-important characteristics when buying a diamond. As a starting point
-it seems reasonable to model price as a function of those four
-characteristics.
+# Modeling Price
+
+Blue Nile's [buying guide][buying-guide] describes how the four C's
+(cut, color, clarity, and carat weight) are the most important
+characteristics when buying a diamond. It seems
+reasonable to model price as a function of those four
+characteristics. Having played around with the data bit, a
+multiplicative model fits the data well. I model price as a product of
+carat weight raised to the power $\beta$ times multipliers for the
+cut, color, and clarity of the diamond
+$$
+price_i \propto carat_i^\beta \cdot cut_i \cdot color_i \cdot clarity_i.
+$$
+Taking $\log$'s of both sides allows this model to be estimated using
+a linear regression
+$$
+\log(price_i) = \alpha + \beta \log(carat_i) + \delta_{cut_i} +
+\delta_{color_i} + \delta_{clarity_i} + \epsilon_i.
+$$
+Focusing on diamonds weighing between 1.00 and 1.99 carats, we can see
+the relationship between $\log(price_i)$ and $\log(carat_i)$ is
+remarkably linear with diamond color shifting the intercept but not
+the slope of the relationship.
 
 ```{r zoomed_in}
 carats <- seq(1, 1.9, 0.1)
@@ -135,19 +142,15 @@ my_formula <- paste('log(price) ~ log(carat) +',
 fit <- lm(my_formula, data=diamonds)
 ```
 
-We just fit the following model
-$$
-\log(price_i) = \alpha + \beta^0 \log(carat_i) + \beta^1_{cut(i)} + \beta^2_{color(i)} + \beta^3_{clarity(i)} + \epsilon_i
-$$
-Exponentiating both sides of the equation we have a multiplicative relationship between price and the Four C's:
-$$
-price_i = \exp(\alpha) \cdot carat_i^{\beta^0} \cdot \exp\left(\beta^1_{cut(i)}\right) \cdot \exp\left(\beta^2_{color(i)}\right) \cdot \exp\left(\beta^3_{clarity(i)}\right) \cdot \exp(\epsilon_i)
-$$
-Exponentiating the coefficients from our regression model we can get estimates of the price multipliers associated with different diamond characteristics. These multipliers can help a shopper decide what type of diamond to look at. Is a G-color diamond worth `r round(exp(coef(fit)['color4']), 2)` times the price of a J-color diamond?
+Below is a summary of the fitted linear model. Generally, I try not to
+focus much on R-squared values, but this model explains 91.5% of the
+observed variance in $\log(price_i)$ using four variables!
 
 ```{r}
 summary(fit)
 ```
+
+Exponentiating the coefficients from our regression model we can get estimates of the price multipliers associated with different diamond characteristics. These multipliers can help a shopper decide what type of diamond to look at. Is a G-color diamond worth `r round(exp(coef(fit)['color4']), 2)` times the price of a J-color diamond?
 
 ```{r coefplot}
 l <- lapply(dummies, function(s) {
@@ -174,7 +177,7 @@ multipliers$high <- multipliers$multiplier + diff
 )
 ```
 
-# Identifying diamond deals
+# Identifying Deals
 
 ```{r}
 yhat <- exp(predict(fit))
