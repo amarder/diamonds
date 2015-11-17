@@ -101,7 +101,7 @@ Blue Nile's [buying guide][buying-guide] describes how the four C's
 characteristics when buying a diamond. It seems
 reasonable to model price as a function of those four
 characteristics. Having played around with the data bit, a
-multiplicative model fits the data well. I model price as a product of
+multiplicative model seems like a good choice. I model price as a product of
 carat weight raised to the power $\beta$ times multipliers for the
 cut, color, and clarity of the diamond
 $$
@@ -142,9 +142,9 @@ my_formula <- paste('log(price) ~ log(carat) +',
 fit <- lm(my_formula, data=diamonds)
 ```
 
-Below is a summary of the fitted linear model. Generally, I try not to
-focus much on R-squared values, but this model explains 91.5% of the
-observed variance in $\log(price_i)$ using four variables!
+Below is a summary of the fitted linear model. Generally, I put very
+little weight on R-squared values, but this model explains 91.5% of
+the observed variance in $\log(price_i)$!
 
 ```{r}
 summary(fit)
@@ -179,10 +179,35 @@ multipliers$high <- multipliers$multiplier + diff
 
 # Identifying Deals
 
+Having read Blue Nile's buying guide a few times, they've convinced me to care about all four of the four C's. When purchasing a diamond, the following cut, color, and clarity are my baseline:
+
+* $cut_i \ge$ Ideal: Represents roughly the top 3% of diamond quality based on cut. Reflects nearly all light that enters the diamond. An exquisite and rare cut.
+
+* $color_i \ge$ H: Near-colorless. Color difficult to detect unless compared side-by-side against diamonds of better grades. An excellent value.
+
+* $clarity_i \ge$ VS1: Very Slightly Included: Imperfections are not typically visible to the unaided eye. Less expensive than the VVS1 or VVS2 grades.'
+
 ```{r}
-yhat <- exp(predict(fit))
-diamonds$markup <- (diamonds$price / yhat - 1) * 100
-diamonds %>% arrange(markup) %>% select(markup, carat, cut, color, clarity, price) %>% head(20)
+focus <- diamonds %>% filter(1 <= carat, carat < 2, cut >= 'Ideal', color >= 'H', clarity >= 'VS1')
+fit <- lm(log(price) ~ log(carat), focus)
+focus$residual <- resid(fit)
+focus$Deal <- focus$residual <= quantile(focus$residual, 0.01)
+(
+    ggplot(focus, aes(x=log(carat + noise), y=log(price))) +
+    geom_point(aes(color=Deal, shape=Deal), size=1) +
+    stat_smooth(method='lm') +
+    ggtitle('Diamond price versus diamond weight') +
+    ylab("Price") +
+    xlab('Carat Weight') +
+    theme_bw() +
+    theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank()) +
+    scale_colour_manual(values=c('grey', 'red'))
+)
+```
+
+```{r}
+focus <- focus %>% arrange(residual)
+focus %>% select(residual, carat, cut, color, clarity, price) %>% head(20)
 ```
 
 [blue-nile]: http://www.bluenile.com/
