@@ -68,8 +68,8 @@ stats <- lapply(diamonds[, c('price', 'carat', dummies)], function(x)
 my_format <- function(x) format(x, scientific=FALSE, big.mark=',')
 ```
 
-On November 6, 2015, I downloaded data on all `r my_format(nrow(diamonds))`
-round diamonds on Blue Nile. Below is a
+On November 6, 2015, I downloaded data on all
+`r my_format(nrow(diamonds))` round diamonds on Blue Nile. Below is a
 plot of diamond price versus carat weight (both on log scales).
 
 ```{r big_picture}
@@ -98,12 +98,12 @@ price_labels <- paste0('$', prices / 1000, ',000')
 
 Blue Nile's [buying guide][buying-guide] describes how the four C's
 (cut, color, clarity, and carat weight) are the most important
-characteristics when buying a diamond. It seems
-reasonable to model price as a function of those four
-characteristics. Having played around with the data bit, a
-multiplicative model seems like a good choice. I model price as a product of
-carat weight raised to the power $\beta$ times multipliers for the
-cut, color, and clarity of the diamond
+characteristics when buying a diamond. It seems reasonable to model
+price as a function of those four characteristics. Having played
+around with the data bit, a multiplicative model seems like a good
+choice. I model price as a product of carat weight raised to the power
+$\beta$ times multipliers for the cut, color, and clarity of the
+diamond
 $$
 price_i \propto carat_i^\beta \cdot cut_i \cdot color_i \cdot clarity_i.
 $$
@@ -150,7 +150,12 @@ the observed variance in $\log(price_i)$!
 summary(fit)
 ```
 
-Exponentiating the coefficients from our regression model we can get estimates of the price multipliers associated with different diamond characteristics. These multipliers can help a shopper decide what type of diamond to look at. Is a G-color diamond worth `r round(exp(coef(fit)['color4']), 2)` times the price of a J-color diamond?
+Exponentiating the coefficients from our regression model we can get
+estimates of the price multipliers associated with different diamond
+characteristics. These multipliers can help a shopper decide what type
+of diamond to look at. Is a G-color diamond worth
+`r round(exp(coef(fit)['color4']), 2)` times the price of a J-color
+diamond?
 
 ```{r coefplot}
 l <- lapply(dummies, function(s) {
@@ -179,15 +184,31 @@ multipliers$high <- multipliers$multiplier + diff
 
 # Identifying Deals
 
-Having read Blue Nile's buying guide a few times, they've convinced me to care about all four of the four C's. When purchasing a diamond, the following cut, color, and clarity are my baseline:
+Having read Blue Nile's buying guide a few times, they've convinced me
+to care about all four of the four C's. When purchasing a diamond, the
+following cut, color, and clarity are my baseline:
 
-* $cut_i \ge$ Ideal: Represents roughly the top 3% of diamond quality based on cut. Reflects nearly all light that enters the diamond. An exquisite and rare cut.
+* $cut_i \ge$ Ideal: Represents roughly the top 3% of diamond quality
+  based on cut. Reflects nearly all light that enters the diamond. An
+  exquisite and rare cut.
 
-* $color_i \ge$ H: Near-colorless. Color difficult to detect unless compared side-by-side against diamonds of better grades. An excellent value.
+* $color_i \ge$ H: Near-colorless. Color difficult to detect unless
+  compared side-by-side against diamonds of better grades. An
+  excellent value.
 
-* $clarity_i \ge$ VS1: Very Slightly Included: Imperfections are not typically visible to the unaided eye. Less expensive than the VVS1 or VVS2 grades.'
+* $clarity_i \ge$ VS1: Very Slightly Included: Imperfections are not
+  typically visible to the unaided eye. Less expensive than the VVS1
+  or VVS2 grades.
 
-```{r}
+Below I plot the diamonds that meet my baseline. Fitting a linear
+relationship between $\log(price_i)$ and $\log(carat_i)$, I highlight
+the best 1% of deals, the diamonds where the difference between
+expected and actual price is greatest
+$$
+\alpha + \beta \log(carat_i) - \log(p_i) = -\epsilon_i.
+$$
+
+```{r deals}
 focus <- diamonds %>% filter(1 <= carat, carat < 2, cut >= 'Ideal', color >= 'H', clarity >= 'VS1')
 fit <- lm(log(price) ~ log(carat), focus)
 focus$residual <- resid(fit)
@@ -196,19 +217,34 @@ focus$Deal <- focus$residual <= quantile(focus$residual, 0.01)
     ggplot(focus, aes(x=log(carat + noise), y=log(price))) +
     geom_point(aes(color=Deal, shape=Deal), size=1) +
     stat_smooth(method='lm') +
-    ggtitle('Diamond price versus diamond weight') +
+    ggtitle('Diamonds with low prices') +
     ylab("Price") +
     xlab('Carat Weight') +
     theme_bw() +
     theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank()) +
-    scale_colour_manual(values=c('grey', 'red'))
+    scale_x_continuous(breaks=log(carats), labels=carats) +
+    scale_y_continuous(breaks=log(prices), labels=price_labels) +
+    scale_colour_manual(values=c('#dddddd', 'red')) +
+    theme(legend.position="none")
 )
 ```
 
+The table below describes the top 10 diamonds found using my
+criteria.
+
 ```{r}
 focus <- focus %>% arrange(residual)
-focus %>% select(residual, carat, cut, color, clarity, price) %>% head(20)
+my_table <- focus %>% select(residual, cut, color, clarity, carat, price) %>% head(10)
+kable(my_table, digits=2)
 ```
+
+Disclaimer: This is one way to identify deals. A more general solution
+would allow shoppers to enter preference parameters, similar to the
+regression coefficients found above. Taking preference parameters
+$\beta$, the best deals would maximize the shopper's utility
+$$
+u(X_i, p_i) = X_i \beta - p_i.
+$$
 
 [blue-nile]: http://www.bluenile.com/
 [solr]: http://lucene.apache.org/solr/
