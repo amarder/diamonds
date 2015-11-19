@@ -1,5 +1,5 @@
 ---
-title: Blue Nile + Data Analysis = Diamond Deals
+title: Diamond Deals
 date: 2015-11-11
 ---
 
