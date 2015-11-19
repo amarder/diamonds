@@ -12,3 +12,6 @@ blog: diamonds.html
 	rm -r $(IMG_FOLDER)
 	cp -r figure $(IMG_FOLDER)
 	cat diamonds.md | sed "s+(figure/+($(IMG_URL)/+" | sed "s/\_/\\\_/g" > $(BLOG)/content/post/diamonds.md
+
+diamonds.docx: diamonds.html
+	pandoc diamonds.md -o diamonds.docx
