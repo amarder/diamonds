@@ -125,6 +125,7 @@ price_labels <- paste0('$', prices / 1000, ',000')
 diamonds <- diamonds %>% filter(1 <= carat & carat < 2)
 (
     ggplot(diamonds, aes(x=log(carat + noise), y=log(price), color=color)) +
+    guides(color = guide_legend(reverse = TRUE)) +
     geom_point(size=0.4) +
     stat_smooth(method='lm') +
     scale_x_continuous(breaks=log(carats), labels=carats) +
@@ -133,7 +134,8 @@ diamonds <- diamonds %>% filter(1 <= carat & carat < 2)
     ylab("Price") +
     xlab('Carat Weight') +
     theme_bw() +
-    theme(panel.grid.minor.x=element_blank(), panel.grid.minor.y=element_blank())
+    theme(panel.grid.minor.x=element_blank(),
+    panel.grid.minor.y=element_blank(), legend.position=c(0.9, 0.2))
 )
 
 my_formula <- paste('log(price) ~ log(carat) +',
