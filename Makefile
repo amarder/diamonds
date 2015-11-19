@@ -11,4 +11,4 @@ IMG_URL = /images/diamonds
 blog: diamonds.html
 	rm -r $(IMG_FOLDER)
 	cp -r figure $(IMG_FOLDER)
-	sed "s+(figure/+($(IMG_URL)/+" diamonds.md > $(BLOG)/content/post/diamonds.md
+	cat diamonds.md | sed "s+(figure/+($(IMG_URL)/+" | sed "s/\_/\\\_/g" > $(BLOG)/content/post/diamonds.md
