@@ -20,7 +20,7 @@ def diamonds(params):
     assert params['sortColumn'] == 'price' and params['sortDirection'] == 'asc'
 
     landing_page = requests.get('http://www.bluenile.com/')
-    url = 'http://www.bluenile.com/api/public/diamond-search-grid/solr'
+    url = 'http://www.bluenile.com/api/public/diamond-search-grid/v2'
     result = []
     while True:
         response = requests.get(url, params, cookies=landing_page.cookies)
